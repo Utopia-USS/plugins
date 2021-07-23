@@ -8,6 +8,7 @@ import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import androidx.annotation.NonNull;
 import java.io.IOException;
+import android.media.MediaRecorder;
 
 public class MediaRecorderBuilder {
   static class MediaRecorderFactory {
@@ -56,7 +57,7 @@ public class MediaRecorderBuilder {
     mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
     mediaRecorder.setOutputFormat(recordingProfile.fileFormat);
     if (enableAudio) {
-      mediaRecorder.setAudioEncoder(recordingProfile.audioCodec);
+      mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
       mediaRecorder.setAudioEncodingBitRate(recordingProfile.audioBitRate);
       mediaRecorder.setAudioSamplingRate(recordingProfile.audioSampleRate);
     }
