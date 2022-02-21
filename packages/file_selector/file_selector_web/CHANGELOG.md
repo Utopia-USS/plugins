@@ -1,3 +1,16 @@
+## 0.8.1+3
+
+* Minor code cleanup for new analysis rules.
+* Removes dependency on `meta`.
+
+## 0.8.1+2
+
+* Add `implements` to pubspec.
+
+# 0.8.1+1
+
+- Updated installation instructions in README.
+
 # 0.8.1
 
 - Return a non-null value from `getSavePath` for consistency with

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:convert';
 import 'dart:io' as io;
 
 import 'package:args/command_runner.dart';
@@ -16,7 +17,7 @@ import 'package:test/test.dart';
 import 'mocks.dart';
 import 'util.dart';
 
-const String _fakeIosDevice = '67d5c3d1-8bdf-46ad-8f6b-b00e2a972dda';
+const String _fakeIOSDevice = '67d5c3d1-8bdf-46ad-8f6b-b00e2a972dda';
 const String _fakeAndroidDevice = 'emulator-1234';
 
 void main() {
@@ -41,7 +42,7 @@ void main() {
     });
 
     void setMockFlutterDevicesOutput({
-      bool hasIosDevice = true,
+      bool hasIOSDevice = true,
       bool hasAndroidDevice = true,
       bool includeBanner = false,
     }) {
@@ -53,19 +54,18 @@ void main() {
 ╚════════════════════════════════════════════════════════════════════════════╝
 ''';
       final List<String> devices = <String>[
-        if (hasIosDevice) '{"id": "$_fakeIosDevice", "targetPlatform": "ios"}',
+        if (hasIOSDevice) '{"id": "$_fakeIOSDevice", "targetPlatform": "ios"}',
         if (hasAndroidDevice)
           '{"id": "$_fakeAndroidDevice", "targetPlatform": "android-x86"}',
       ];
       final String output =
           '''${includeBanner ? updateBanner : ''}[${devices.join(',')}]''';
 
-      final MockProcess mockDevicesProcess = MockProcess.succeeding();
-      mockDevicesProcess.stdoutController.close(); // ignore: unawaited_futures
+      final MockProcess mockDevicesProcess =
+          MockProcess(stdout: output, stdoutEncoding: utf8);
       processRunner
               .mockProcessesForExecutable[getFlutterCommand(mockPlatform)] =
           <io.Process>[mockDevicesProcess];
-      processRunner.resultStdout = output;
     }
 
     test('fails if no platforms are provided', () async {
@@ -104,7 +104,7 @@ void main() {
     });
 
     test('fails for iOS if no iOS devices are present', () async {
-      setMockFlutterDevicesOutput(hasIosDevice: false);
+      setMockFlutterDevicesOutput(hasIOSDevice: false);
 
       Error? commandError;
       final List<String> output = await runCapturingPrint(
@@ -129,8 +129,8 @@ void main() {
           'example/test_driver/integration_test.dart',
           'example/integration_test/foo_test.dart',
         ],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformIos: PlatformSupport.inline,
+        platformSupport: <String, PlatformDetails>{
+          platformIOS: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -151,7 +151,7 @@ void main() {
       // Simulate failure from `flutter devices`.
       processRunner
               .mockProcessesForExecutable[getFlutterCommand(mockPlatform)] =
-          <io.Process>[MockProcess.failing()];
+          <io.Process>[MockProcess(exitCode: 1)];
 
       Error? commandError;
       final List<String> output = await runCapturingPrint(
@@ -194,9 +194,9 @@ void main() {
           'example/test_driver/plugin_test.dart',
           'example/test_driver/plugin.dart',
         ],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformAndroid: PlatformSupport.inline,
-          kPlatformIos: PlatformSupport.inline,
+        platformSupport: <String, PlatformDetails>{
+          platformAndroid: const PlatformDetails(PlatformSupport.inline),
+          platformIOS: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -225,7 +225,7 @@ void main() {
                 const <String>[
                   'drive',
                   '-d',
-                  _fakeIosDevice,
+                  _fakeIOSDevice,
                   '--driver',
                   'test_driver/plugin_test.dart',
                   '--target',
@@ -244,9 +244,9 @@ void main() {
         extraFiles: <String>[
           'example/test_driver/plugin_test.dart',
         ],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformAndroid: PlatformSupport.inline,
-          kPlatformIos: PlatformSupport.inline,
+        platformSupport: <String, PlatformDetails>{
+          platformAndroid: const PlatformDetails(PlatformSupport.inline),
+          platformIOS: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -277,9 +277,9 @@ void main() {
         extraFiles: <String>[
           'example/lib/main.dart',
         ],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformAndroid: PlatformSupport.inline,
-          kPlatformIos: PlatformSupport.inline,
+        platformSupport: <String, PlatformDetails>{
+          platformAndroid: const PlatformDetails(PlatformSupport.inline),
+          platformIOS: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -313,9 +313,9 @@ void main() {
           'example/integration_test/foo_test.dart',
           'example/integration_test/ignore_me.dart',
         ],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformAndroid: PlatformSupport.inline,
-          kPlatformIos: PlatformSupport.inline,
+        platformSupport: <String, PlatformDetails>{
+          platformAndroid: const PlatformDetails(PlatformSupport.inline),
+          platformIOS: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -344,7 +344,7 @@ void main() {
                 const <String>[
                   'drive',
                   '-d',
-                  _fakeIosDevice,
+                  _fakeIOSDevice,
                   '--driver',
                   'test_driver/integration_test.dart',
                   '--target',
@@ -356,7 +356,7 @@ void main() {
                 const <String>[
                   'drive',
                   '-d',
-                  _fakeIosDevice,
+                  _fakeIOSDevice,
                   '--driver',
                   'test_driver/integration_test.dart',
                   '--target',
@@ -399,8 +399,8 @@ void main() {
           'example/test_driver/plugin_test.dart',
           'example/test_driver/plugin.dart',
         ],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformLinux: PlatformSupport.inline,
+        platformSupport: <String, PlatformDetails>{
+          platformLinux: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -472,8 +472,8 @@ void main() {
           'example/test_driver/plugin.dart',
           'example/macos/macos.swift',
         ],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformMacos: PlatformSupport.inline,
+        platformSupport: <String, PlatformDetails>{
+          platformMacOS: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -543,8 +543,8 @@ void main() {
           'example/test_driver/plugin_test.dart',
           'example/test_driver/plugin.dart',
         ],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformWeb: PlatformSupport.inline,
+        platformSupport: <String, PlatformDetails>{
+          platformWeb: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -575,6 +575,58 @@ void main() {
                   'web-server',
                   '--web-port=7357',
                   '--browser-name=chrome',
+                  '--driver',
+                  'test_driver/plugin_test.dart',
+                  '--target',
+                  'test_driver/plugin.dart'
+                ],
+                pluginExampleDirectory.path),
+          ]));
+    });
+
+    test('driving a web plugin with CHROME_EXECUTABLE', () async {
+      final Directory pluginDirectory = createFakePlugin(
+        'plugin',
+        packagesDir,
+        extraFiles: <String>[
+          'example/test_driver/plugin_test.dart',
+          'example/test_driver/plugin.dart',
+        ],
+        platformSupport: <String, PlatformDetails>{
+          platformWeb: const PlatformDetails(PlatformSupport.inline),
+        },
+      );
+
+      final Directory pluginExampleDirectory =
+          pluginDirectory.childDirectory('example');
+
+      mockPlatform.environment['CHROME_EXECUTABLE'] = '/path/to/chrome';
+
+      final List<String> output = await runCapturingPrint(runner, <String>[
+        'drive-examples',
+        '--web',
+      ]);
+
+      expect(
+        output,
+        containsAllInOrder(<Matcher>[
+          contains('Running for plugin'),
+          contains('No issues found!'),
+        ]),
+      );
+
+      expect(
+          processRunner.recordedCalls,
+          orderedEquals(<ProcessCall>[
+            ProcessCall(
+                getFlutterCommand(mockPlatform),
+                const <String>[
+                  'drive',
+                  '-d',
+                  'web-server',
+                  '--web-port=7357',
+                  '--browser-name=chrome',
+                  '--chrome-binary=/path/to/chrome',
                   '--driver',
                   'test_driver/plugin_test.dart',
                   '--target',
@@ -617,8 +669,8 @@ void main() {
           'example/test_driver/plugin_test.dart',
           'example/test_driver/plugin.dart',
         ],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformWindows: PlatformSupport.inline
+        platformSupport: <String, PlatformDetails>{
+          platformWindows: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -656,6 +708,40 @@ void main() {
           ]));
     });
 
+    test('driving UWP is a no-op', () async {
+      createFakePlugin(
+        'plugin',
+        packagesDir,
+        extraFiles: <String>[
+          'example/test_driver/plugin_test.dart',
+          'example/test_driver/plugin.dart',
+        ],
+        platformSupport: <String, PlatformDetails>{
+          platformWindows: const PlatformDetails(PlatformSupport.inline,
+              variants: <String>[platformVariantWinUwp]),
+        },
+      );
+
+      final List<String> output = await runCapturingPrint(runner, <String>[
+        'drive-examples',
+        '--winuwp',
+      ]);
+
+      expect(
+        output,
+        containsAllInOrder(<Matcher>[
+          contains('Driving UWP applications is not yet supported'),
+          contains('Running for plugin'),
+          contains('SKIPPING: Drive does not yet support UWP'),
+          contains('No issues found!'),
+        ]),
+      );
+
+      // Output should be empty since running drive-examples --windows on a
+      // non-Windows plugin is a no-op.
+      expect(processRunner.recordedCalls, <ProcessCall>[]);
+    });
+
     test('driving on an Android plugin', () async {
       final Directory pluginDirectory = createFakePlugin(
         'plugin',
@@ -664,8 +750,8 @@ void main() {
           'example/test_driver/plugin_test.dart',
           'example/test_driver/plugin.dart',
         ],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformAndroid: PlatformSupport.inline,
+        platformSupport: <String, PlatformDetails>{
+          platformAndroid: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -714,8 +800,8 @@ void main() {
           'example/test_driver/plugin_test.dart',
           'example/test_driver/plugin.dart',
         ],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformMacos: PlatformSupport.inline,
+        platformSupport: <String, PlatformDetails>{
+          platformMacOS: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -747,8 +833,8 @@ void main() {
           'example/test_driver/plugin_test.dart',
           'example/test_driver/plugin.dart',
         ],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformMacos: PlatformSupport.inline,
+        platformSupport: <String, PlatformDetails>{
+          platformMacOS: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -802,9 +888,9 @@ void main() {
           'example/test_driver/plugin_test.dart',
           'example/test_driver/plugin.dart',
         ],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformAndroid: PlatformSupport.inline,
-          kPlatformIos: PlatformSupport.inline,
+        platformSupport: <String, PlatformDetails>{
+          platformAndroid: const PlatformDetails(PlatformSupport.inline),
+          platformIOS: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -828,7 +914,7 @@ void main() {
                 const <String>[
                   'drive',
                   '-d',
-                  _fakeIosDevice,
+                  _fakeIOSDevice,
                   '--enable-experiment=exp1',
                   '--driver',
                   'test_driver/plugin_test.dart',
@@ -844,8 +930,8 @@ void main() {
         'plugin',
         packagesDir,
         examples: <String>[],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformWeb: PlatformSupport.inline,
+        platformSupport: <String, PlatformDetails>{
+          platformWeb: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -876,8 +962,8 @@ void main() {
           'example/integration_test/bar_test.dart',
           'example/integration_test/foo_test.dart',
         ],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformWeb: PlatformSupport.inline,
+        platformSupport: <String, PlatformDetails>{
+          platformWeb: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -908,8 +994,8 @@ void main() {
         extraFiles: <String>[
           'example/test_driver/integration_test.dart',
         ],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformWeb: PlatformSupport.inline,
+        platformSupport: <String, PlatformDetails>{
+          platformWeb: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -944,8 +1030,8 @@ void main() {
           'example/integration_test/bar_test.dart',
           'example/integration_test/foo_test.dart',
         ],
-        platformSupport: <String, PlatformSupport>{
-          kPlatformMacos: PlatformSupport.inline,
+        platformSupport: <String, PlatformDetails>{
+          platformMacOS: const PlatformDetails(PlatformSupport.inline),
         },
       );
 
@@ -954,8 +1040,8 @@ void main() {
               .mockProcessesForExecutable[getFlutterCommand(mockPlatform)] =
           <io.Process>[
         // No mock for 'devices', since it's running for macOS.
-        MockProcess.failing(), // 'drive' #1
-        MockProcess.failing(), // 'drive' #2
+        MockProcess(exitCode: 1), // 'drive' #1
+        MockProcess(exitCode: 1), // 'drive' #2
       ];
 
       Error? commandError;

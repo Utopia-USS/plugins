@@ -11,8 +11,10 @@ First, add `image_picker` as a [dependency in your pubspec.yaml file](https://fl
 
 ### iOS
 
+This plugin requires iOS 9.0 or higher.
+
 Starting with version **0.8.1** the iOS implementation uses PHPicker to pick (multiple) images on iOS 14 or higher.
-As a result of implementing PHPicker it becomes impossible to pick HEIC images on the iOS simulator in iOS 14+. This is a known issue. Please test this on a real device, or test with non-HEIC images until Apple solves this issue.[63426347 - Apple known issue](https://www.google.com/search?q=63426347+apple&sxsrf=ALeKk01YnTMid5S0PYvhL8GbgXJ40ZS[…]t=gws-wiz&ved=0ahUKEwjKh8XH_5HwAhWL_rsIHUmHDN8Q4dUDCA8&uact=5)
+As a result of implementing PHPicker it becomes impossible to pick HEIC images on the iOS simulator in iOS 14+. This is a known issue. Please test this on a real device, or test with non-HEIC images until Apple solves this issue. [63426347 - Apple known issue](https://www.google.com/search?q=63426347+apple&sxsrf=ALeKk01YnTMid5S0PYvhL8GbgXJ40ZS[…]t=gws-wiz&ved=0ahUKEwjKh8XH_5HwAhWL_rsIHUmHDN8Q4dUDCA8&uact=5)
 
 Add the following keys to your _Info.plist_ file, located in `<project root>/ios/Runner/Info.plist`:
 
@@ -24,7 +26,11 @@ Add the following keys to your _Info.plist_ file, located in `<project root>/ios
 
 Starting with version **0.8.1** the Android implementation support to pick (multiple) images on Android 4.3 or higher.
 
-No configuration required - the plugin should work out of the box.
+No configuration required - the plugin should work out of the box. It is 
+however highly recommended to prepare for Android killing the application when
+low on memory. How to prepare for this is discussed in the [Handling 
+MainActivity destruction on Android](#handling-mainactivity-destruction-on-android)
+section.
 
 It is no longer required to add `android:requestLegacyExternalStorage="true"` as an attribute to the `<application>` tag in AndroidManifest.xml, as `image_picker` has been updated to make use of scoped storage.
 
@@ -45,17 +51,22 @@ import 'package:image_picker/image_picker.dart';
     // Pick a video
     final XFile? image = await _picker.pickVideo(source: ImageSource.gallery);
     // Capture a video
-    final XFile? photo = await _picker.pickVideo(source: ImageSource.camera);
+    final XFile? video = await _picker.pickVideo(source: ImageSource.camera);
     // Pick multiple images
-    final List<XFile>? images = await _picker.pickMultiImage(source: ImageSource.gallery);
-    // Pick multiple photos
-    final List<XFile>? photos = await _picker.pickMultiImage(source: ImageSource.camera);
+    final List<XFile>? images = await _picker.pickMultiImage();
     ...
 ```
 
 ### Handling MainActivity destruction on Android
 
-Android system -- although very rarely -- sometimes kills the MainActivity after the image_picker finishes. When this happens, we lost the data selected from the image_picker. You can use `retrieveLostData` to retrieve the lost data in this situation. For example:
+When under high memory pressure the Android system may kill the MainActivity of
+the application using the image_picker. On Android the image_picker makes use 
+of the default `Intent.ACTION_GET_CONTENT` or `MediaStore.ACTION_IMAGE_CAPTURE` 
+intents. This means that while the intent is executing the source application 
+is moved to the background and becomes eligable for cleanup when the system is
+low on memory. When the intent finishes executing, Android will restart the 
+application. Since the data is never returned to the original call use the 
+`ImagePicker.retrieveLostData()` method to retrieve the lost data. For example:
 
 ```dart
 Future<void> getLostData() async {
@@ -64,23 +75,20 @@ Future<void> getLostData() async {
   if (response.isEmpty) {
     return;
   }
-  if (response.file != null) {
-    setState(() {
-      if (response.type == RetrieveType.video) {
-        _handleVideo(response.file);
-      } else {
-        _handleImage(response.file);
-      }
-    });
+  if (response.files != null) {
+    for (final XFile file in response.files) {
+      _handleFile(file);
+    }
   } else {
     _handleError(response.exception);
   }
 }
 ```
 
-There's no way to detect when this happens, so calling this method at the right place is essential. We recommend to wire this into some kind of start up check. Please refer to the example app to see how we used it.
-
-On Android, `retrieveLostData` will only get the last picked image when picking multiple images, see: [#84634](https://github.com/flutter/flutter/issues/84634).
+This check should always be run at startup in order to detect and handle this 
+case. Please refer to the 
+[example app](https://pub.dev/packages/image_picker/example) for a more 
+complete example of handling this flow.
 
 ## Migrating to 0.8.2+
 

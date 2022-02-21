@@ -32,24 +32,24 @@ abstract class QuickActionsPlatform extends PlatformInterface {
   // TODO(amirh): Extract common platform interface logic.
   // https://github.com/flutter/flutter/issues/43368
   static set instance(QuickActionsPlatform instance) {
-    PlatformInterface.verifyToken(instance, _token);
+    PlatformInterface.verify(instance, _token);
     _instance = instance;
   }
 
   /// Initializes this plugin.
   ///
-  /// Call this once before any further interaction with the the plugin.
+  /// Call this once before any further interaction with the plugin.
   Future<void> initialize(QuickActionHandler handler) async {
-    throw UnimplementedError("initialize() has not been implemented.");
+    throw UnimplementedError('initialize() has not been implemented.');
   }
 
   /// Sets the [ShortcutItem]s to become the app's quick actions.
   Future<void> setShortcutItems(List<ShortcutItem> items) async {
-    throw UnimplementedError("setShortcutItems() has not been implemented.");
+    throw UnimplementedError('setShortcutItems() has not been implemented.');
   }
 
   /// Removes all [ShortcutItem]s registered for the app.
   Future<void> clearShortcutItems() {
-    throw UnimplementedError("clearShortcutItems() has not been implemented.");
+    throw UnimplementedError('clearShortcutItems() has not been implemented.');
   }
 }
