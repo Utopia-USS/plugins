@@ -8,25 +8,30 @@ On iOS the WebView widget is backed by a [WKWebView](https://developer.apple.com
 On Android the WebView widget is backed by a [WebView](https://developer.android.com/reference/android/webkit/WebView).
 
 ## Usage
-Add `webview_flutter` as a [dependency in your pubspec.yaml file](https://flutter.dev/docs/development/platform-integration/platform-channels).
+Add `webview_flutter` as a [dependency in your pubspec.yaml file](https://flutter.dev/docs/development/platform-integration/platform-channels). If you are targeting Android, make sure to read the *Android Platform Views* section below to choose the platform view mode that best suits your needs.
 
 You can now include a WebView widget in your widget tree. See the
 [WebView](https://pub.dev/documentation/webview_flutter/latest/webview_flutter/WebView-class.html)
 widget's Dartdoc for more details on how to use the widget.
 
 ## Android Platform Views
-The WebView is relying on
+This plugin uses
 [Platform Views](https://flutter.dev/docs/development/platform-integration/platform-views) to embed
-the Android’s webview within the Flutter app. By default a Virtual Display based platform view
-backend is used, this implementation has multiple
+the Android’s webview within the Flutter app. It supports two modes:
+*hybrid composition* (the current default) and *virtual display*.
+
+Here are some points to consider when choosing between the two:
+
+* *Hybrid composition* has built-in keyboard support while *virtual display* has multiple
 [keyboard issues](https://github.com/flutter/flutter/issues?q=is%3Aopen+label%3Avd-only+label%3A%22p%3A+webview-keyboard%22).
-When keyboard input is required we recommend using the Hybrid Composition based platform views
-implementation. Note that on Android versions prior to Android 10 Hybrid Composition has some
-[performance drawbacks](https://flutter.dev/docs/development/platform-integration/platform-views#performance).
+* *Hybrid composition* requires Android SDK 19+ while *virtual display* requires Android SDK 20+.
+* *Hybrid composition* and *virtual display* have different
+  [performance tradeoffs](https://flutter.dev/docs/development/platform-integration/platform-views#performance).
+
 
 ### Using Hybrid Composition
 
-1. Set the `minSdkVersion` in `android/app/build.gradle`:
+The mode is currently enabled by default. You should however make sure to set the correct `minSdkVersion` in `android/app/build.gradle` if it was previously lower than 19:
 
 ```groovy
 android {
@@ -36,39 +41,54 @@ android {
 }
 ```
 
-This means that app will only be available for users that run Android SDK 19 or higher.
+### Using Virtual displays
 
-2. To enable hybrid composition, set `WebView.platform = SurfaceAndroidWebView();` in `initState()`.
-For example:
+1. Set the correct `minSdkVersion` in `android/app/build.gradle` (if it was previously lower than 20):
 
-```dart
-import 'dart:io';
+    ```groovy
+    android {
+        defaultConfig {
+            minSdkVersion 20
+        }
+    }
+    ```
 
-import 'package:webview_flutter/webview_flutter.dart';
+2. Set `WebView.platform = AndroidWebView();` in `initState()`.
+    For example:
 
-class WebViewExample extends StatefulWidget {
-  @override
-  WebViewExampleState createState() => WebViewExampleState();
-}
+    ```dart
+    import 'dart:io';
 
-class WebViewExampleState extends State<WebViewExample> {
-  @override
-  void initState() {
-    super.initState();
-    // Enable hybrid composition.
-    if (Platform.isAndroid) WebView.platform = SurfaceAndroidWebView();
-  }
+    import 'package:webview_flutter/webview_flutter.dart';
 
-  @override
-  Widget build(BuildContext context) {
-    return WebView(
-      initialUrl: 'https://flutter.dev',
-    );
-  }
-}
-```
+    class WebViewExample extends StatefulWidget {
+      @override
+      WebViewExampleState createState() => WebViewExampleState();
+    }
 
-#### Enable Material Components for Android
+    class WebViewExampleState extends State<WebViewExample> {
+      @override
+      void initState() {
+        super.initState();
+        // Enable virtual display.
+        if (Platform.isAndroid) WebView.platform = AndroidWebView();
+      }
+
+      @override
+      Widget build(BuildContext context) {
+        return WebView(
+          initialUrl: 'https://flutter.dev',
+        );
+      }
+    }
+    ```
+
+### Enable Material Components for Android
 
 To use Material Components when the user interacts with input elements in the WebView,
 follow the steps described in the [Enabling Material Components instructions](https://flutter.dev/docs/deployment/android#enabling-material-components).
+
+### Setting custom headers on POST requests
+
+Currently, setting custom headers when making a post request with the WebViewController's `loadRequest` method is not supported on Android.
+If you require this functionality, a workaround is to make the request manually, and then load the response data using `loadHTMLString` instead. 

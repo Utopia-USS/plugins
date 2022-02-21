@@ -1,6 +1,12 @@
-## NEXT
+## 2.0.3
+
+* Switches to an in-package method channel implementation.
+* Fixes newly enabled analyzer options.
+
+## 2.0.2
 
 * Add native unit tests.
+* Updated installation instructions in README.
 
 ## 2.0.1
 

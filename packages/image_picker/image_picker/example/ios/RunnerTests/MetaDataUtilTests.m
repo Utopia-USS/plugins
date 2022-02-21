@@ -5,6 +5,7 @@
 #import "ImagePickerTestImages.h"
 
 @import image_picker;
+@import image_picker.Test;
 @import XCTest;
 
 @interface MetaDataUtilTests : XCTestCase
@@ -60,7 +61,7 @@
   NSString *tmpFile = [NSString stringWithFormat:@"image_picker_test.jpg"];
   NSString *tmpDirectory = NSTemporaryDirectory();
   NSString *tmpPath = [tmpDirectory stringByAppendingPathComponent:tmpFile];
-  NSData *newData = [FLTImagePickerMetaDataUtil updateMetaData:metaData toImage:dataJPG];
+  NSData *newData = [FLTImagePickerMetaDataUtil imageFromImage:dataJPG withMetaData:metaData];
   if ([[NSFileManager defaultManager] createFileAtPath:tmpPath contents:newData attributes:nil]) {
     NSData *savedTmpImageData = [NSData dataWithContentsOfFile:tmpPath];
     NSDictionary *tmpMetaData =
@@ -69,6 +70,14 @@
   } else {
     XCTAssert(NO);
   }
+}
+
+- (void)testUpdateMetaDataBadData {
+  NSData *imageData = [NSData data];
+
+  NSDictionary *metaData = [FLTImagePickerMetaDataUtil getMetaDataFromImageData:imageData];
+  NSData *newData = [FLTImagePickerMetaDataUtil imageFromImage:imageData withMetaData:metaData];
+  XCTAssertNil(newData);
 }
 
 - (void)testConvertImageToData {

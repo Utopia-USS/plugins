@@ -75,11 +75,9 @@ void main() {
       );
 
       processRunner.mockProcessesForExecutable['pod'] = <io.Process>[
-        MockProcess.succeeding(),
-        MockProcess.succeeding(),
+        MockProcess(stdout: 'Foo', stderr: 'Bar'),
+        MockProcess(),
       ];
-      processRunner.resultStdout = 'Foo';
-      processRunner.resultStderr = 'Bar';
 
       final List<String> output =
           await runCapturingPrint(runner, <String>['podspecs']);
@@ -125,55 +123,13 @@ void main() {
       expect(output, contains('Bar'));
     });
 
-    test('allow warnings for podspecs with known warnings', () async {
-      final Directory plugin1Dir = createFakePlugin('plugin1', packagesDir,
-          extraFiles: <String>['plugin1.podspec']);
-
-      final List<String> output = await runCapturingPrint(
-          runner, <String>['podspecs', '--ignore-warnings=plugin1']);
-
-      expect(
-        processRunner.recordedCalls,
-        orderedEquals(<ProcessCall>[
-          ProcessCall('which', const <String>['pod'], packagesDir.path),
-          ProcessCall(
-              'pod',
-              <String>[
-                'lib',
-                'lint',
-                plugin1Dir.childFile('plugin1.podspec').path,
-                '--configuration=Debug',
-                '--skip-tests',
-                '--use-modular-headers',
-                '--allow-warnings',
-                '--use-libraries'
-              ],
-              packagesDir.path),
-          ProcessCall(
-              'pod',
-              <String>[
-                'lib',
-                'lint',
-                plugin1Dir.childFile('plugin1.podspec').path,
-                '--configuration=Debug',
-                '--skip-tests',
-                '--use-modular-headers',
-                '--allow-warnings',
-              ],
-              packagesDir.path),
-        ]),
-      );
-
-      expect(output, contains('Linting plugin1.podspec'));
-    });
-
     test('fails if pod is missing', () async {
       createFakePlugin('plugin1', packagesDir,
           extraFiles: <String>['plugin1.podspec']);
 
       // Simulate failure from `which pod`.
       processRunner.mockProcessesForExecutable['which'] = <io.Process>[
-        MockProcess.failing(),
+        MockProcess(exitCode: 1),
       ];
 
       Error? commandError;
@@ -199,7 +155,7 @@ void main() {
 
       // Simulate failure from `pod`.
       processRunner.mockProcessesForExecutable['pod'] = <io.Process>[
-        MockProcess.failing(),
+        MockProcess(exitCode: 1),
       ];
 
       Error? commandError;
@@ -227,8 +183,8 @@ void main() {
 
       // Simulate failure from the second call to `pod`.
       processRunner.mockProcessesForExecutable['pod'] = <io.Process>[
-        MockProcess.succeeding(),
-        MockProcess.failing(),
+        MockProcess(),
+        MockProcess(exitCode: 1),
       ];
 
       Error? commandError;

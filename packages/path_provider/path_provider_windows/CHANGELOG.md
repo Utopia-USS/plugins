@@ -1,3 +1,15 @@
+## 2.0.5
+
+* Removes dependency on `meta`.
+
+## 2.0.4
+
+* Removed obsolete `pluginClass: none` from pubpsec.
+
+## 2.0.3
+
+* Updated installation instructions in README.
+
 ## 2.0.2
 
 * Add `implements` to pubspec.yaml.

@@ -12,6 +12,7 @@ import 'common/core.dart';
 import 'common/package_looping_command.dart';
 import 'common/plugin_utils.dart';
 import 'common/process_runner.dart';
+import 'common/repository_package.dart';
 
 const int _exitNoPlatformFlags = 2;
 const int _exitNoAvailableDevice = 3;
@@ -24,18 +25,21 @@ class DriveExamplesCommand extends PackageLoopingCommand {
     ProcessRunner processRunner = const ProcessRunner(),
     Platform platform = const LocalPlatform(),
   }) : super(packagesDir, processRunner: processRunner, platform: platform) {
-    argParser.addFlag(kPlatformAndroid,
+    argParser.addFlag(platformAndroid,
         help: 'Runs the Android implementation of the examples');
-    argParser.addFlag(kPlatformIos,
+    argParser.addFlag(platformIOS,
         help: 'Runs the iOS implementation of the examples');
-    argParser.addFlag(kPlatformLinux,
+    argParser.addFlag(platformLinux,
         help: 'Runs the Linux implementation of the examples');
-    argParser.addFlag(kPlatformMacos,
+    argParser.addFlag(platformMacOS,
         help: 'Runs the macOS implementation of the examples');
-    argParser.addFlag(kPlatformWeb,
+    argParser.addFlag(platformWeb,
         help: 'Runs the web implementation of the examples');
-    argParser.addFlag(kPlatformWindows,
-        help: 'Runs the Windows implementation of the examples');
+    argParser.addFlag(platformWindows,
+        help: 'Runs the Windows (Win32) implementation of the examples');
+    argParser.addFlag(platformWinUwp,
+        help:
+            'Runs the UWP implementation of the examples [currently a no-op]');
     argParser.addOption(
       kEnableExperiment,
       defaultsTo: '',
@@ -60,12 +64,13 @@ class DriveExamplesCommand extends PackageLoopingCommand {
   @override
   Future<void> initializeRun() async {
     final List<String> platformSwitches = <String>[
-      kPlatformAndroid,
-      kPlatformIos,
-      kPlatformLinux,
-      kPlatformMacos,
-      kPlatformWeb,
-      kPlatformWindows,
+      platformAndroid,
+      platformIOS,
+      platformLinux,
+      platformMacOS,
+      platformWeb,
+      platformWindows,
+      platformWinUwp,
     ];
     final int platformCount = platformSwitches
         .where((String platform) => getBoolArg(platform))
@@ -80,8 +85,12 @@ class DriveExamplesCommand extends PackageLoopingCommand {
       throw ToolExit(_exitNoPlatformFlags);
     }
 
+    if (getBoolArg(platformWinUwp)) {
+      logWarning('Driving UWP applications is not yet supported');
+    }
+
     String? androidDevice;
-    if (getBoolArg(kPlatformAndroid)) {
+    if (getBoolArg(platformAndroid)) {
       final List<String> devices = await _getDevicesForPlatform('android');
       if (devices.isEmpty) {
         printError('No Android devices available');
@@ -90,38 +99,43 @@ class DriveExamplesCommand extends PackageLoopingCommand {
       androidDevice = devices.first;
     }
 
-    String? iosDevice;
-    if (getBoolArg(kPlatformIos)) {
+    String? iOSDevice;
+    if (getBoolArg(platformIOS)) {
       final List<String> devices = await _getDevicesForPlatform('ios');
       if (devices.isEmpty) {
         printError('No iOS devices available');
         throw ToolExit(_exitNoAvailableDevice);
       }
-      iosDevice = devices.first;
+      iOSDevice = devices.first;
     }
 
     _targetDeviceFlags = <String, List<String>>{
-      if (getBoolArg(kPlatformAndroid))
-        kPlatformAndroid: <String>['-d', androidDevice!],
-      if (getBoolArg(kPlatformIos)) kPlatformIos: <String>['-d', iosDevice!],
-      if (getBoolArg(kPlatformLinux)) kPlatformLinux: <String>['-d', 'linux'],
-      if (getBoolArg(kPlatformMacos)) kPlatformMacos: <String>['-d', 'macos'],
-      if (getBoolArg(kPlatformWeb))
-        kPlatformWeb: <String>[
+      if (getBoolArg(platformAndroid))
+        platformAndroid: <String>['-d', androidDevice!],
+      if (getBoolArg(platformIOS)) platformIOS: <String>['-d', iOSDevice!],
+      if (getBoolArg(platformLinux)) platformLinux: <String>['-d', 'linux'],
+      if (getBoolArg(platformMacOS)) platformMacOS: <String>['-d', 'macos'],
+      if (getBoolArg(platformWeb))
+        platformWeb: <String>[
           '-d',
           'web-server',
           '--web-port=7357',
-          '--browser-name=chrome'
+          '--browser-name=chrome',
+          if (platform.environment.containsKey('CHROME_EXECUTABLE'))
+            '--chrome-binary=${platform.environment['CHROME_EXECUTABLE']}',
         ],
-      if (getBoolArg(kPlatformWindows))
-        kPlatformWindows: <String>['-d', 'windows'],
+      if (getBoolArg(platformWindows))
+        platformWindows: <String>['-d', 'windows'],
+      // TODO(stuartmorgan): Check these flags once drive supports UWP:
+      // https://github.com/flutter/flutter/issues/82821
+      if (getBoolArg(platformWinUwp)) platformWinUwp: <String>['-d', 'winuwp'],
     };
   }
 
   @override
-  Future<PackageResult> runForPackage(Directory package) async {
-    if (package.basename.endsWith('_platform_interface') &&
-        !package.childDirectory('example').existsSync()) {
+  Future<PackageResult> runForPackage(RepositoryPackage package) async {
+    if (package.isPlatformInterface &&
+        !package.getSingleExampleDeprecated().directory.existsSync()) {
       // Platform interface packages generally aren't intended to have
       // examples, and don't need integration tests, so skip rather than fail.
       return PackageResult.skip(
@@ -131,7 +145,17 @@ class DriveExamplesCommand extends PackageLoopingCommand {
     final List<String> deviceFlags = <String>[];
     for (final MapEntry<String, List<String>> entry
         in _targetDeviceFlags.entries) {
-      if (pluginSupportsPlatform(entry.key, package)) {
+      final String platform = entry.key;
+      String? variant;
+      if (platform == platformWindows) {
+        variant = platformVariantWin32;
+      } else if (platform == platformWinUwp) {
+        variant = platformVariantWinUwp;
+        // TODO(stuartmorgan): Remove this once drive supports UWP.
+        // https://github.com/flutter/flutter/issues/82821
+        return PackageResult.skip('Drive does not yet support UWP');
+      }
+      if (pluginSupportsPlatform(platform, package, variant: variant)) {
         deviceFlags.addAll(entry.value);
       } else {
         print('Skipping unsupported platform ${entry.key}...');
@@ -140,16 +164,16 @@ class DriveExamplesCommand extends PackageLoopingCommand {
     // If there is no supported target platform, skip the plugin.
     if (deviceFlags.isEmpty) {
       return PackageResult.skip(
-          '${getPackageDescription(package)} does not support any requested platform.');
+          '${package.displayName} does not support any requested platform.');
     }
 
     int examplesFound = 0;
     bool testsRan = false;
     final List<String> errors = <String>[];
-    for (final Directory example in getExamplesForPlugin(package)) {
+    for (final RepositoryPackage example in package.getExamples()) {
       ++examplesFound;
       final String exampleName =
-          getRelativePosixPath(example, from: packagesDir);
+          getRelativePosixPath(example.directory, from: packagesDir);
 
       final List<File> drivers = await _getDrivers(example);
       if (drivers.isEmpty) {
@@ -173,7 +197,7 @@ class DriveExamplesCommand extends PackageLoopingCommand {
 
         if (testTargets.isEmpty) {
           final String driverRelativePath =
-              getRelativePosixPath(driver, from: package);
+              getRelativePosixPath(driver, from: package.directory);
           printError(
               'Found $driverRelativePath, but no integration_test/*_test.dart files.');
           errors.add('No test files for $driverRelativePath');
@@ -185,7 +209,8 @@ class DriveExamplesCommand extends PackageLoopingCommand {
             example, driver, testTargets,
             deviceFlags: deviceFlags);
         for (final File failingTarget in failingTargets) {
-          errors.add(getRelativePosixPath(failingTarget, from: package));
+          errors.add(
+              getRelativePosixPath(failingTarget, from: package.directory));
         }
       }
     }
@@ -229,10 +254,10 @@ class DriveExamplesCommand extends PackageLoopingCommand {
     return deviceIds;
   }
 
-  Future<List<File>> _getDrivers(Directory example) async {
+  Future<List<File>> _getDrivers(RepositoryPackage example) async {
     final List<File> drivers = <File>[];
 
-    final Directory driverDir = example.childDirectory('test_driver');
+    final Directory driverDir = example.directory.childDirectory('test_driver');
     if (driverDir.existsSync()) {
       await for (final FileSystemEntity driver in driverDir.list()) {
         if (driver is File && driver.basename.endsWith('_test.dart')) {
@@ -253,10 +278,10 @@ class DriveExamplesCommand extends PackageLoopingCommand {
     return testFile.existsSync() ? testFile : null;
   }
 
-  Future<List<File>> _getIntegrationTests(Directory example) async {
+  Future<List<File>> _getIntegrationTests(RepositoryPackage example) async {
     final List<File> tests = <File>[];
     final Directory integrationTestDir =
-        example.childDirectory('integration_test');
+        example.directory.childDirectory('integration_test');
 
     if (integrationTestDir.existsSync()) {
       await for (final FileSystemEntity file in integrationTestDir.list()) {
@@ -278,7 +303,7 @@ class DriveExamplesCommand extends PackageLoopingCommand {
   ///   - `['-d', 'web-server', '--web-port=<port>', '--browser-name=<browser>]`
   ///     for web
   Future<List<File>> _driveTests(
-    Directory example,
+    RepositoryPackage example,
     File driver,
     List<File> targets, {
     required List<String> deviceFlags,
@@ -296,11 +321,11 @@ class DriveExamplesCommand extends PackageLoopingCommand {
             if (enableExperiment.isNotEmpty)
               '--enable-experiment=$enableExperiment',
             '--driver',
-            getRelativePosixPath(driver, from: example),
+            getRelativePosixPath(driver, from: example.directory),
             '--target',
-            getRelativePosixPath(target, from: example),
+            getRelativePosixPath(target, from: example.directory),
           ],
-          workingDir: example);
+          workingDir: example.directory);
       if (exitCode != 0) {
         failures.add(target);
       }
