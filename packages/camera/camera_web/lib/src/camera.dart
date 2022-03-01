@@ -276,7 +276,7 @@ class Camera {
   /// the video track does not include the width or height setting.
   Size getVideoSize() {
     final List<html.MediaStreamTrack> videoTracks =
-        elementList[0].video.srcObject?.getVideoTracks() ?? <html.MediaStreamTrack>[];
+        stream?.getVideoTracks() ?? <html.MediaStreamTrack>[];
 
     if (videoTracks.isEmpty) {
       return Size.zero;
