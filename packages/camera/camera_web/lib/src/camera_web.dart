@@ -265,7 +265,8 @@ class CameraPlugin extends CameraPlatform {
 
       // Add camera's video error events to the camera events stream.
       // The error event fires when the video element's source has failed to load, or can't be used.
-      _cameraVideoErrorSubscriptions[cameraId] =
+      // TODO not working
+      /*_cameraVideoErrorSubscriptions[cameraId] =
           camera.videoElement.onError.listen((html.Event _) {
         // The Event itself (_) doesn't contain information about the actual error.
         // We need to look at the HTMLMediaElement.error.
@@ -281,11 +282,11 @@ class CameraPlugin extends CameraPlatform {
             'Error code: $errorCode, error message: $errorMessage',
           ),
         );
-      });
+      });*/
 
       // Add camera's video abort events to the camera events stream.
       // The abort event fires when the video element's source has not fully loaded.
-      _cameraVideoAbortSubscriptions[cameraId] =
+      /*_cameraVideoAbortSubscriptions[cameraId] =
           camera.videoElement.onAbort.listen((html.Event _) {
         cameraEventStreamController.add(
           CameraErrorEvent(
@@ -293,7 +294,7 @@ class CameraPlugin extends CameraPlatform {
             'Error code: ${CameraErrorCode.abort}, error message: The video element\'s source has not fully loaded.',
           ),
         );
-      });
+      });*/
 
       await camera.play();
 
