@@ -4,11 +4,10 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
@@ -16,6 +15,8 @@ import 'package:video_player_platform_interface/video_player_platform_interface.
 class FakeController extends ValueNotifier<VideoPlayerValue>
     implements VideoPlayerController {
   FakeController() : super(VideoPlayerValue(duration: Duration.zero));
+
+  FakeController.value(VideoPlayerValue value) : super(value);
 
   @override
   Future<void> dispose() async {
@@ -72,6 +73,11 @@ class FakeController extends ValueNotifier<VideoPlayerValue>
 
   @override
   void setCaptionOffset(Duration delay) {}
+
+  @override
+  Future<void> setClosedCaptionFile(
+    Future<ClosedCaptionFile>? closedCaptionFile,
+  ) async {}
 }
 
 Future<ClosedCaptionFile> _loadClosedCaption() async =>
@@ -98,6 +104,19 @@ class _FakeClosedCaptionFile extends ClosedCaptionFile {
 }
 
 void main() {
+  void _verifyPlayStateRespondsToLifecycle(
+    VideoPlayerController controller, {
+    required bool shouldPlayInBackground,
+  }) {
+    expect(controller.value.isPlaying, true);
+    _ambiguate(WidgetsBinding.instance)!
+        .handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    expect(controller.value.isPlaying, shouldPlayInBackground);
+    _ambiguate(WidgetsBinding.instance)!
+        .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    expect(controller.value.isPlaying, true);
+  }
+
   testWidgets('update texture', (WidgetTester tester) async {
     final FakeController controller = FakeController();
     await tester.pumpWidget(VideoPlayer(controller));
@@ -131,6 +150,27 @@ void main() {
           (Widget widget) => widget is Texture && widget.textureId == 102,
         ),
         findsOneWidget);
+  });
+
+  testWidgets('non-zero rotationCorrection value is used',
+      (WidgetTester tester) async {
+    final FakeController controller = FakeController.value(
+        VideoPlayerValue(duration: Duration.zero, rotationCorrection: 180));
+    controller.textureId = 1;
+    await tester.pumpWidget(VideoPlayer(controller));
+    final Transform actualRotationCorrection =
+        find.byType(Transform).evaluate().single.widget as Transform;
+    expect(
+        actualRotationCorrection.transform, equals(Matrix4.rotationZ(math.pi)));
+  });
+
+  testWidgets('no transform when rotationCorrection is zero',
+      (WidgetTester tester) async {
+    final FakeController controller = FakeController.value(
+        VideoPlayerValue(duration: Duration.zero, rotationCorrection: 0));
+    controller.textureId = 1;
+    await tester.pumpWidget(VideoPlayer(controller));
+    expect(find.byType(Transform), findsNothing);
   });
 
   group('ClosedCaption widget', () {
@@ -194,6 +234,16 @@ void main() {
     });
 
     group('initialize', () {
+      test('started app lifecycle observing', () async {
+        final VideoPlayerController controller = VideoPlayerController.network(
+          'https://127.0.0.1',
+        );
+        await controller.initialize();
+        await controller.play();
+        _verifyPlayStateRespondsToLifecycle(controller,
+            shouldPlayInBackground: false);
+      });
+
       test('asset', () async {
         final VideoPlayerController controller = VideoPlayerController.asset(
           'a.avi',
@@ -321,6 +371,17 @@ void main() {
 
       expect(controller.textureId, 0);
       expect(await controller.position, isNull);
+    });
+
+    test('calling dispose() on disposed controller does not throw', () async {
+      final VideoPlayerController controller = VideoPlayerController.network(
+        'https://127.0.0.1',
+      );
+
+      await controller.initialize();
+      await controller.dispose();
+
+      expect(() async => await controller.dispose(), returnsNormally);
     });
 
     test('play', () async {
@@ -649,6 +710,37 @@ void main() {
         await controller.seekTo(const Duration(milliseconds: 300));
         expect(controller.value.caption.text, 'one');
       });
+
+      test('setClosedCapitonFile loads caption file', () async {
+        final VideoPlayerController controller = VideoPlayerController.network(
+          'https://127.0.0.1',
+        );
+
+        await controller.initialize();
+        expect(controller.closedCaptionFile, null);
+
+        await controller.setClosedCaptionFile(_loadClosedCaption());
+        expect(
+          (await controller.closedCaptionFile)!.captions,
+          (await _loadClosedCaption()).captions,
+        );
+      });
+
+      test('setClosedCapitonFile removes/changes caption file', () async {
+        final VideoPlayerController controller = VideoPlayerController.network(
+          'https://127.0.0.1',
+          closedCaptionFile: _loadClosedCaption(),
+        );
+
+        await controller.initialize();
+        expect(
+          (await controller.closedCaptionFile)!.captions,
+          (await _loadClosedCaption()).captions,
+        );
+
+        await controller.setClosedCaptionFile(null);
+        expect(controller.closedCaptionFile, null);
+      });
     });
 
     group('Platform callbacks', () {
@@ -900,6 +992,53 @@ void main() {
     });
   });
 
+  group('VideoPlayerOptions', () {
+    late FakeVideoPlayerPlatform fakeVideoPlayerPlatform;
+
+    setUp(() {
+      fakeVideoPlayerPlatform = FakeVideoPlayerPlatform();
+      VideoPlayerPlatform.instance = fakeVideoPlayerPlatform;
+    });
+
+    test('setMixWithOthers', () async {
+      final VideoPlayerController controller = VideoPlayerController.file(
+          File(''),
+          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true));
+      await controller.initialize();
+      expect(controller.videoPlayerOptions!.mixWithOthers, true);
+    });
+
+    test('true allowBackgroundPlayback continues playback', () async {
+      final VideoPlayerController controller = VideoPlayerController.file(
+        File(''),
+        videoPlayerOptions: VideoPlayerOptions(
+          allowBackgroundPlayback: true,
+        ),
+      );
+      await controller.initialize();
+      await controller.play();
+      _verifyPlayStateRespondsToLifecycle(
+        controller,
+        shouldPlayInBackground: true,
+      );
+    });
+
+    test('false allowBackgroundPlayback pauses playback', () async {
+      final VideoPlayerController controller = VideoPlayerController.file(
+        File(''),
+        videoPlayerOptions: VideoPlayerOptions(
+          allowBackgroundPlayback: false,
+        ),
+      );
+      await controller.initialize();
+      await controller.play();
+      _verifyPlayStateRespondsToLifecycle(
+        controller,
+        shouldPlayInBackground: false,
+      );
+    });
+  });
+
   test('VideoProgressColors', () {
     const Color playedColor = Color.fromRGBO(0, 0, 255, 0.75);
     const Color bufferedColor = Color.fromRGBO(0, 255, 0, 0.5);
@@ -913,14 +1052,6 @@ void main() {
     expect(colors.playedColor, playedColor);
     expect(colors.bufferedColor, bufferedColor);
     expect(colors.backgroundColor, backgroundColor);
-  });
-
-  test('setMixWithOthers', () async {
-    final VideoPlayerController controller = VideoPlayerController.file(
-        File(''),
-        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true));
-    await controller.initialize();
-    expect(controller.videoPlayerOptions!.mixWithOthers, true);
   });
 }
 
@@ -1010,3 +1141,9 @@ class FakeVideoPlayerPlatform extends VideoPlayerPlatform {
     calls.add('setMixWithOthers');
   }
 }
+
+/// This allows a value of type T or T? to be treated as a value of type T?.
+///
+/// We use this so that APIs that have become non-nullable can still be used
+/// with `!` and `?` on the stable branch.
+T? _ambiguate<T>(T? value) => value;
